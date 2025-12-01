@@ -1,0 +1,32 @@
+# Source files
+src/
+examples/
+tsconfig.json
+tsup.config.ts
+
+# Development files
+.git/
+.github/
+node_modules/
+*.log
+*.tgz
+
+# Test files
+tests/
+coverage/
+*.test.ts
+*.spec.ts
+
+# Documentation (keep README.md, CHANGELOG.md, LICENSE)
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.DS_Store
+.env
+.env.local
