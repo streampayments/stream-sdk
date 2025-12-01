@@ -1,0 +1,23 @@
+# Code Owners for StreamPay SDK
+# These owners will be automatically requested for review when someone opens a pull request.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @ibtisam-streampay @streampay/sdk-team
+
+# Source code requires review from SDK team
+/src/** @ibtisam-streampay @streampay/sdk-team
+
+# Package.json changes require admin approval
+/package.json @ibtisam-streampay
+
+# Documentation can be reviewed by anyone on the team
+/*.md @streampay/sdk-team
+/docs/** @streampay/sdk-team
+
+# Build configuration requires careful review
+/tsconfig.json @ibtisam-streampay
+/tsup.config.ts @ibtisam-streampay
+
+# GitHub workflows require admin approval
+/.github/workflows/** @ibtisam-streampay
