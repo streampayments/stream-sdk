@@ -11,6 +11,7 @@ const streamClient = StreamSDK.init(process.env.STREAM_API_KEY);
  * POST /api/create-payment
  *
  * Body: {
+ *   name: "Order #1234",
  *   amount: 99.99,
  *   customerEmail: "customer@example.com",
  *   customerName: "John Doe",
@@ -20,10 +21,10 @@ const streamClient = StreamSDK.init(process.env.STREAM_API_KEY);
  */
 app.post('/api/create-payment', async (req, res) => {
   try {
-    const { amount, customerEmail, customerName, productName, description } = req.body;
+    const { name, amount, customerEmail, customerName, productName, description } = req.body;
 
     const result = await streamClient.createSimplePaymentLink({
-      name: productName || `Order ${Date.now()}`,
+      name: name || `Order ${Date.now()}`,
       description: description || 'Payment',
       amount,
       currency: 'SAR',
@@ -32,7 +33,7 @@ app.post('/api/create-payment', async (req, res) => {
         name: customerName
       },
       product: {
-        name: productName,
+        name: productName || 'Product',
         price: amount,
         currency: 'SAR'
       },
@@ -56,37 +57,76 @@ app.post('/api/create-payment', async (req, res) => {
 });
 
 /**
- * Create payment with existing product
+ * Create payment with existing product(s)
  * POST /api/create-payment-with-product
  *
  * Body: {
- *   productId: "prod_123",
- *   amount: 99.99,
- *   customerEmail: "customer@example.com"
+ *   name: "Order for Premium Package",
+ *   productIds: ["prod_123", "prod_456"],  // Single or multiple products
+ *   customerEmail: "customer@example.com",
+ *   customerName: "John Doe"
  * }
  */
 app.post('/api/create-payment-with-product', async (req, res) => {
   try {
-    const { productId, amount, customerEmail, customerName } = req.body;
+    const { name, productIds, customerEmail, customerName } = req.body;
 
-    const result = await streamClient.createSimplePaymentLink({
-      name: `Order ${Date.now()}`,
-      amount,
-      currency: 'SAR',
-      consumer: customerEmail ? {
-        email: customerEmail,
-        name: customerName
-      } : undefined,
-      product: {
-        id: productId
-      },
-      successRedirectUrl: `${req.protocol}://${req.get('host')}/payment/success`,
-      failureRedirectUrl: `${req.protocol}://${req.get('host')}/payment/failed`
-    });
+    // Ensure productIds is an array
+    const ids = Array.isArray(productIds) ? productIds : [productIds];
+
+    // Fetch product details to calculate total amount
+    const products = await Promise.all(
+      ids.map(id => streamClient.getProduct(id))
+    );
+
+    // Calculate total amount from products
+    const totalAmount = products.reduce((sum, product) => {
+      return sum + parseFloat(String(product.price));
+    }, 0);
+
+    // For multiple products, use the advanced createPaymentLink method
+    const linkData = {
+      name: name || `Order ${Date.now()}`,
+      items: ids.map(id => ({
+        product_id: id,
+        quantity: 1
+      })),
+      organization_consumer_id: null,
+      coupons: [],
+      success_redirect_url: `${req.protocol}://${req.get('host')}/payment/success`,
+      failure_redirect_url: `${req.protocol}://${req.get('host')}/payment/failed`
+    };
+
+    // Add consumer if provided
+    if (customerEmail) {
+      // Find or create consumer
+      const consumers = await streamClient.listConsumers({ page: 1, size: 100 });
+      let consumer = consumers.data?.find(c => c.email === customerEmail);
+
+      if (!consumer && customerName) {
+        consumer = await streamClient.createConsumer({
+          email: customerEmail,
+          name: customerName
+        });
+      }
+
+      if (consumer) {
+        linkData.organization_consumer_id = consumer.id;
+      }
+    }
+
+    const paymentLink = await streamClient.createPaymentLink(linkData);
+    const paymentUrl = streamClient.getPaymentUrl(paymentLink);
 
     res.json({
       success: true,
-      paymentUrl: result.paymentUrl
+      paymentUrl,
+      totalAmount,
+      products: products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price
+      }))
     });
   } catch (error) {
     console.error('Payment creation error:', error);
@@ -102,21 +142,23 @@ app.post('/api/create-payment-with-product', async (req, res) => {
  * POST /api/create-guest-payment
  *
  * Body: {
+ *   name: "Guest Order #5678",
  *   amount: 49.99,
- *   productName: "One-time Purchase"
+ *   productName: "One-time Purchase",
+ *   description: "Single item purchase"
  * }
  */
 app.post('/api/create-guest-payment', async (req, res) => {
   try {
-    const { amount, productName, description } = req.body;
+    const { name, amount, productName, description } = req.body;
 
     const result = await streamClient.createSimplePaymentLink({
-      name: productName || `Order ${Date.now()}`,
+      name: name || `Order ${Date.now()}`,
       description,
       amount,
       currency: 'SAR',
       product: {
-        name: productName,
+        name: productName || 'Product',
         price: amount,
         currency: 'SAR'
       },
@@ -215,7 +257,12 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`StreamPay Express server running on port ${PORT}`);
   console.log(`\nTest the API:`);
+  console.log(`\n1. Simple payment (creates new product):`);
   console.log(`curl -X POST http://localhost:${PORT}/api/create-payment \\`);
   console.log(`  -H "Content-Type: application/json" \\`);
-  console.log(`  -d '{"amount": 99.99, "customerEmail": "test@example.com", "customerName": "John Doe", "productName": "Premium Plan"}'`);
+  console.log(`  -d '{"name": "Order #1234", "amount": 99.99, "customerEmail": "test@example.com", "customerName": "John Doe", "productName": "Premium Plan"}'`);
+  console.log(`\n2. Payment with existing product(s):`);
+  console.log(`curl -X POST http://localhost:${PORT}/api/create-payment-with-product \\`);
+  console.log(`  -H "Content-Type: application/json" \\`);
+  console.log(`  -d '{"name": "Order #5678", "productIds": ["prod_123"], "customerEmail": "test@example.com"}'`);
 });

@@ -31,6 +31,7 @@ npm run express
 curl -X POST http://localhost:3000/api/create-payment \
   -H "Content-Type: application/json" \
   -d '{
+    "name": "Order #1234",
     "amount": 99.99,
     "customerEmail": "customer@example.com",
     "customerName": "John Doe",
@@ -40,14 +41,25 @@ curl -X POST http://localhost:3000/api/create-payment \
 ```
 
 #### Create Payment (with existing product)
+Fetches product details automatically and supports multiple products:
 ```bash
+# Single product
 curl -X POST http://localhost:3000/api/create-payment-with-product \
   -H "Content-Type: application/json" \
   -d '{
-    "productId": "prod_123",
-    "amount": 99.99,
+    "name": "Order #5678",
+    "productIds": ["prod_123"],
     "customerEmail": "customer@example.com",
     "customerName": "John Doe"
+  }'
+
+# Multiple products
+curl -X POST http://localhost:3000/api/create-payment-with-product \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Bundle Order #9012",
+    "productIds": ["prod_123", "prod_456", "prod_789"],
+    "customerEmail": "customer@example.com"
   }'
 ```
 
@@ -56,6 +68,7 @@ curl -X POST http://localhost:3000/api/create-payment-with-product \
 curl -X POST http://localhost:3000/api/create-guest-payment \
   -H "Content-Type: application/json" \
   -d '{
+    "name": "Guest Order #3456",
     "amount": 49.99,
     "productName": "One-time Purchase",
     "description": "Single item purchase"
@@ -74,7 +87,9 @@ curl http://localhost:3000/api/products?page=1&size=10
 curl http://localhost:3000/api/payment-links?page=1&size=10
 ```
 
-### Response Example:
+### Response Examples:
+
+**Simple Payment:**
 ```json
 {
   "success": true,
@@ -84,10 +99,34 @@ curl http://localhost:3000/api/payment-links?page=1&size=10
 }
 ```
 
+**Payment with Existing Products:**
+```json
+{
+  "success": true,
+  "paymentUrl": "https://checkout.streampay.sa/pay/link_abc123",
+  "totalAmount": 299.97,
+  "products": [
+    {
+      "id": "prod_123",
+      "name": "Premium Plan",
+      "price": "99.99"
+    },
+    {
+      "id": "prod_456",
+      "name": "Add-on Feature",
+      "price": "199.98"
+    }
+  ]
+}
+```
+
 ## Key Features Demonstrated
 
 1. **Simple Payment Creation**: Create payment link with consumer and product in one call
-2. **Existing Product**: Use existing product ID
-3. **Guest Checkout**: Create payment without consumer (collect email at checkout)
-4. **Redirect URLs**: Success and failure redirect handling
-5. **Error Handling**: Proper error handling and response formatting
+2. **Multiple Products**: Use existing product IDs (single or multiple)
+3. **Automatic Amount Calculation**: Fetches product details and calculates total
+4. **Smart Consumer Matching**: Reuses existing consumers by email
+5. **Guest Checkout**: Create payment without consumer (collect email at checkout)
+6. **Custom Payment Link Names**: User-defined payment link names
+7. **Redirect URLs**: Success and failure redirect handling
+8. **Error Handling**: Proper error handling and response formatting
