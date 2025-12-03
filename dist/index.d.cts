@@ -1978,6 +1978,12 @@ type CreateLinkInput = {
 };
 /**
  * High-level payment link creation with optional inline consumer and product creation
+ *
+ * Smart Matching:
+ * - Consumer: Searches for existing consumer by email or phone before creating new
+ * - Product: Searches for existing product by name and price before creating new
+ * - To force creation of new resources, use unique identifiers
+ * - To use specific existing resources, provide id field
  */
 type SimplePaymentLinkInput = {
     name: string;
@@ -2007,6 +2013,13 @@ type SimplePaymentLinkInput = {
     coupons?: string[];
     customMetadata?: Record<string, unknown>;
     contactInformationType?: "PHONE" | "EMAIL";
+    options?: {
+        /**
+         * If true, always creates new consumer/product even if matching ones exist
+         * Default: false (reuses existing resources)
+         */
+        forceCreate?: boolean;
+    };
 };
 /**
  * Response from simplified payment link creation
@@ -2214,36 +2227,53 @@ declare class StreamClient {
      */
     getPaymentUrl(link: PaymentLinkDetailed): string | null;
     /**
-     * Simplified one-step payment link creation.
+     * Simplified one-step payment link creation with smart resource matching.
      *
      * This method handles:
-     * 1. Creating consumer (if consumer details provided without ID)
-     * 2. Creating product (if product details provided without ID)
-     * 3. Creating payment link
-     * 4. Returning payment URL
+     * 1. Smart consumer matching: Searches for existing consumer by email/phone before creating
+     * 2. Smart product matching: Searches for existing product by name and price before creating
+     * 3. Creating payment link with the matched or newly created resources
+     * 4. Returning payment URL directly
+     *
+     * Resource Matching:
+     * - Consumers: Matched by email (primary) or phone number (secondary)
+     * - Products: Matched by name AND price (both must match)
+     * - Use `consumer.id` or `product.id` to skip matching and use specific resource
+     * - Use `options.forceCreate: true` to always create new resources
      *
      * @example
      * ```typescript
+     * // Reuses existing consumer/product if found
      * const result = await client.createSimplePaymentLink({
      *   name: "Order #1234",
-     *   description: "Payment for premium subscription",
      *   amount: 99.99,
-     *   currency: "SAR",
      *   consumer: {
      *     email: "customer@example.com",
      *     name: "John Doe"
      *   },
      *   product: {
      *     name: "Premium Subscription",
-     *     price: 99.99,
-     *     currency: "SAR"
+     *     price: 99.99
      *   },
-     *   successRedirectUrl: "https://example.com/success",
-     *   failureRedirectUrl: "https://example.com/failed"
+     *   successRedirectUrl: "https://example.com/success"
      * });
      *
-     * console.log(result.paymentUrl); // Direct payment URL
-     * // Optional: Redirect user to result.paymentUrl
+     * // Force creation of new resources
+     * const result = await client.createSimplePaymentLink({
+     *   name: "Order #1234",
+     *   amount: 99.99,
+     *   consumer: { email: "customer@example.com", name: "John Doe" },
+     *   product: { name: "Premium Subscription", price: 99.99 },
+     *   options: { forceCreate: true }
+     * });
+     *
+     * // Use specific existing resources by ID
+     * const result = await client.createSimplePaymentLink({
+     *   name: "Order #1234",
+     *   amount: 99.99,
+     *   consumer: { id: "cons_123" },
+     *   product: { id: "prod_456" }
+     * });
      * ```
      */
     createSimplePaymentLink(input: SimplePaymentLinkInput): Promise<SimplePaymentLinkResponse>;

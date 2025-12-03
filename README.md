@@ -104,35 +104,50 @@ console.log("Payment URL:", client.getPaymentUrl(paymentLink));
 
 ### Simple Payment Links
 
-The easiest way to create payment links with automatic resource creation:
+The easiest way to create payment links with automatic resource creation and smart matching:
+
+**Smart Matching:**
+- Automatically searches for existing consumers by email or phone
+- Automatically searches for existing products by name and price
+- Reuses existing resources to avoid duplicates
+- Creates new resources only when no match is found
 
 ```typescript
-// With consumer and new product
+// Reuses existing consumer/product if they exist
 const result = await client.createSimplePaymentLink({
   name: "Order #1234",
   amount: 199.99,
   currency: "SAR",
   consumer: {
-    email: "customer@example.com",
+    email: "customer@example.com",  // Searches for existing consumer with this email
     name: "Jane Doe"
   },
   product: {
-    name: "Premium Package",
-    price: 199.99
+    name: "Premium Package",         // Searches for existing product with this
+    price: 199.99                    // name and price combination
   },
   successRedirectUrl: "https://yourapp.com/success"
 });
 
-// With existing product ID
+// Use specific existing resources by ID (skips search)
 const result = await client.createSimplePaymentLink({
   name: "Order #1234",
   amount: 99.99,
   product: {
-    id: "prod_existing_123"
+    id: "prod_existing_123"          // Uses this specific product
   },
   consumer: {
-    email: "customer@example.com"
+    id: "cons_existing_456"          // Uses this specific consumer
   }
+});
+
+// Force creation of new resources (no search)
+const result = await client.createSimplePaymentLink({
+  name: "Order #1234",
+  amount: 99.99,
+  consumer: { email: "customer@example.com", name: "Jane" },
+  product: { name: "Premium", price: 99.99 },
+  options: { forceCreate: true }     // Always creates new resources
 });
 
 // Guest checkout (no consumer)
@@ -148,8 +163,8 @@ const result = await client.createSimplePaymentLink({
 
 // Response includes:
 // - paymentUrl: Direct link to payment page
-// - consumerId: Created or provided consumer ID
-// - productId: Created or provided product ID
+// - consumerId: ID of matched or created consumer
+// - productId: ID of matched or created product
 // - paymentLink: Full payment link details
 ```
 

@@ -508,73 +508,133 @@ var StreamClient = class {
   // SIMPLIFIED PAYMENT LINK CREATION
   // ===========================
   /**
-   * Simplified one-step payment link creation.
+   * Simplified one-step payment link creation with smart resource matching.
    *
    * This method handles:
-   * 1. Creating consumer (if consumer details provided without ID)
-   * 2. Creating product (if product details provided without ID)
-   * 3. Creating payment link
-   * 4. Returning payment URL
+   * 1. Smart consumer matching: Searches for existing consumer by email/phone before creating
+   * 2. Smart product matching: Searches for existing product by name and price before creating
+   * 3. Creating payment link with the matched or newly created resources
+   * 4. Returning payment URL directly
+   *
+   * Resource Matching:
+   * - Consumers: Matched by email (primary) or phone number (secondary)
+   * - Products: Matched by name AND price (both must match)
+   * - Use `consumer.id` or `product.id` to skip matching and use specific resource
+   * - Use `options.forceCreate: true` to always create new resources
    *
    * @example
    * ```typescript
+   * // Reuses existing consumer/product if found
    * const result = await client.createSimplePaymentLink({
    *   name: "Order #1234",
-   *   description: "Payment for premium subscription",
    *   amount: 99.99,
-   *   currency: "SAR",
    *   consumer: {
    *     email: "customer@example.com",
    *     name: "John Doe"
    *   },
    *   product: {
    *     name: "Premium Subscription",
-   *     price: 99.99,
-   *     currency: "SAR"
+   *     price: 99.99
    *   },
-   *   successRedirectUrl: "https://example.com/success",
-   *   failureRedirectUrl: "https://example.com/failed"
+   *   successRedirectUrl: "https://example.com/success"
    * });
    *
-   * console.log(result.paymentUrl); // Direct payment URL
-   * // Optional: Redirect user to result.paymentUrl
+   * // Force creation of new resources
+   * const result = await client.createSimplePaymentLink({
+   *   name: "Order #1234",
+   *   amount: 99.99,
+   *   consumer: { email: "customer@example.com", name: "John Doe" },
+   *   product: { name: "Premium Subscription", price: 99.99 },
+   *   options: { forceCreate: true }
+   * });
+   *
+   * // Use specific existing resources by ID
+   * const result = await client.createSimplePaymentLink({
+   *   name: "Order #1234",
+   *   amount: 99.99,
+   *   consumer: { id: "cons_123" },
+   *   product: { id: "prod_456" }
+   * });
    * ```
    */
   async createSimplePaymentLink(input) {
     let consumerId;
     let productId;
+    const forceCreate = input.options?.forceCreate ?? false;
     if (input.consumer) {
       if (input.consumer.id) {
         consumerId = input.consumer.id;
       } else if (input.consumer.email || input.consumer.phone || input.consumer.name) {
-        const consumerData = {};
-        if (input.consumer.name !== void 0) {
-          consumerData.name = input.consumer.name;
+        let existingConsumer = null;
+        if (!forceCreate) {
+          try {
+            const consumers = await this.listConsumers({ page: 1, size: 100 });
+            if (consumers.data && consumers.data.length > 0) {
+              existingConsumer = consumers.data.find((c) => {
+                if (input.consumer?.email && c.email === input.consumer.email) {
+                  return true;
+                }
+                if (input.consumer?.phone && c.phone_number === input.consumer.phone) {
+                  return true;
+                }
+                return false;
+              }) || null;
+            }
+          } catch (error) {
+          }
         }
-        if (input.consumer.email !== void 0) {
-          consumerData.email = input.consumer.email;
-        }
-        if (input.consumer.phone !== void 0) {
-          consumerData.phone_number = input.consumer.phone;
-        }
-        if (consumerData.name || consumerData.email || consumerData.phone_number) {
-          const consumer = await this.createConsumer(consumerData);
-          consumerId = consumer.id;
+        if (existingConsumer) {
+          consumerId = existingConsumer.id;
+        } else {
+          const consumerData = {};
+          if (input.consumer.name !== void 0) {
+            consumerData.name = input.consumer.name;
+          }
+          if (input.consumer.email !== void 0) {
+            consumerData.email = input.consumer.email;
+          }
+          if (input.consumer.phone !== void 0) {
+            consumerData.phone_number = input.consumer.phone;
+          }
+          if (consumerData.name || consumerData.email || consumerData.phone_number) {
+            const consumer = await this.createConsumer(consumerData);
+            consumerId = consumer.id;
+          }
         }
       }
     }
     if (input.product?.id) {
       productId = input.product.id;
     } else {
-      const productData = {
-        name: input.product?.name || input.name,
-        price: input.product?.price || input.amount
-      };
-      if (input.product?.description !== void 0) {
-        productData.description = input.product.description;
+      const productName = input.product?.name || input.name;
+      const productPrice = input.product?.price || input.amount;
+      let existingProduct = null;
+      if (!forceCreate) {
+        try {
+          const products = await this.listProducts({ page: 1, size: 100 });
+          if (products.data && products.data.length > 0) {
+            existingProduct = products.data.find((p) => {
+              const priceMatch = parseFloat(String(p.price)) === parseFloat(String(productPrice));
+              const nameMatch = p.name === productName;
+              return nameMatch && priceMatch;
+            }) || null;
+          }
+        } catch (error) {
+        }
       }
-      const product = await this.createProduct(productData);
-      productId = product.id;
+      if (existingProduct) {
+        productId = existingProduct.id;
+      } else {
+        const productData = {
+          name: productName,
+          price: productPrice
+        };
+        if (input.product?.description !== void 0) {
+          productData.description = input.product.description;
+        }
+        const product = await this.createProduct(productData);
+        productId = product.id;
+      }
     }
     const linkData = {
       name: input.name,

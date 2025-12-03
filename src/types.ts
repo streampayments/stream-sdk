@@ -100,6 +100,12 @@ export type CreateLinkInput = {
 
 /**
  * High-level payment link creation with optional inline consumer and product creation
+ *
+ * Smart Matching:
+ * - Consumer: Searches for existing consumer by email or phone before creating new
+ * - Product: Searches for existing product by name and price before creating new
+ * - To force creation of new resources, use unique identifiers
+ * - To use specific existing resources, provide id field
  */
 export type SimplePaymentLinkInput = {
   // Payment link details
@@ -110,19 +116,19 @@ export type SimplePaymentLinkInput = {
 
   // Consumer (optional) - either ID or create inline
   consumer?: {
-    id?: string;
-    email?: string;
-    phone?: string;
+    id?: string;          // If provided, uses this consumer (skips search)
+    email?: string;       // Used for matching existing consumers
+    phone?: string;       // Used for matching existing consumers
     name?: string;
     metadata?: Record<string, unknown>;
   };
 
   // Product - either ID or create inline
   product?: {
-    id?: string;
-    name?: string;
+    id?: string;          // If provided, uses this product (skips search)
+    name?: string;        // Used for matching existing products
     description?: string;
-    price?: number;
+    price?: number;       // Used for matching existing products
     currency?: string;
     metadata?: Record<string, unknown>;
   };
@@ -140,6 +146,15 @@ export type SimplePaymentLinkInput = {
   coupons?: string[];
   customMetadata?: Record<string, unknown>;
   contactInformationType?: "PHONE" | "EMAIL";
+
+  // Control behavior
+  options?: {
+    /**
+     * If true, always creates new consumer/product even if matching ones exist
+     * Default: false (reuses existing resources)
+     */
+    forceCreate?: boolean;
+  };
 };
 
 /**
