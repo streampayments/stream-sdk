@@ -36,11 +36,44 @@ Or add to `package.json`:
 
 ## Quick Start
 
+### Simple Payment Link Creation (Recommended)
+
+Create a payment link in one call - SDK handles consumer and product creation automatically:
+
 ```typescript
 import StreamSDK from "@streampayments/stream-sdk";
 
 const client = StreamSDK.init(process.env.STREAM_API_KEY!);
 
+const result = await client.createSimplePaymentLink({
+  name: "Premium Subscription",
+  description: "Monthly premium plan",
+  amount: 99.99,
+  currency: "SAR",
+  consumer: {
+    email: "customer@example.com",
+    name: "John Doe",
+    phone: "+966501234567"
+  },
+  product: {
+    name: "Premium Plan",
+    price: 99.99,
+    currency: "SAR"
+  },
+  successRedirectUrl: "https://yourapp.com/success",
+  failureRedirectUrl: "https://yourapp.com/failure"
+});
+
+console.log("Payment URL:", result.paymentUrl);
+console.log("Consumer ID:", result.consumerId);
+console.log("Product ID:", result.productId);
+```
+
+### Advanced Usage (Step-by-Step)
+
+For more control, create resources separately:
+
+```typescript
 // Create a consumer
 const consumer = await client.createConsumer({
   name: "John Doe",
@@ -68,6 +101,57 @@ console.log("Payment URL:", client.getPaymentUrl(paymentLink));
 ```
 
 ## API Reference
+
+### Simple Payment Links
+
+The easiest way to create payment links with automatic resource creation:
+
+```typescript
+// With consumer and new product
+const result = await client.createSimplePaymentLink({
+  name: "Order #1234",
+  amount: 199.99,
+  currency: "SAR",
+  consumer: {
+    email: "customer@example.com",
+    name: "Jane Doe"
+  },
+  product: {
+    name: "Premium Package",
+    price: 199.99
+  },
+  successRedirectUrl: "https://yourapp.com/success"
+});
+
+// With existing product ID
+const result = await client.createSimplePaymentLink({
+  name: "Order #1234",
+  amount: 99.99,
+  product: {
+    id: "prod_existing_123"
+  },
+  consumer: {
+    email: "customer@example.com"
+  }
+});
+
+// Guest checkout (no consumer)
+const result = await client.createSimplePaymentLink({
+  name: "Guest Order",
+  amount: 49.99,
+  product: {
+    name: "One-time Purchase",
+    price: 49.99
+  },
+  contactInformationType: "EMAIL"
+});
+
+// Response includes:
+// - paymentUrl: Direct link to payment page
+// - consumerId: Created or provided consumer ID
+// - productId: Created or provided product ID
+// - paymentLink: Full payment link details
+```
 
 ### Consumers
 
@@ -264,13 +348,27 @@ See [FRAMEWORK_SUPPORT.md](./FRAMEWORK_SUPPORT.md) for examples.
 
 ## Examples
 
-Run the example scripts:
+### Express.js Integration
+
+See [examples/express.js](./examples/express.js) for a complete Express.js server implementation.
 
 ```bash
+cd examples
+npm install
 export STREAM_API_KEY="your-api-key"
-npm run build
-node examples/basic.mjs
-node examples/comprehensive.mjs
+npm run express
+```
+
+Test the API:
+```bash
+curl -X POST http://localhost:3000/api/create-payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 99.99,
+    "customerEmail": "test@example.com",
+    "customerName": "John Doe",
+    "productName": "Premium Plan"
+  }'
 ```
 
 ## Development

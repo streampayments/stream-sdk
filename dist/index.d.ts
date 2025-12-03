@@ -1976,6 +1976,47 @@ type CreateLinkInput = {
     customMetadata?: Record<string, unknown> | null;
     contactInformationType?: "PHONE" | "EMAIL" | null;
 };
+/**
+ * High-level payment link creation with optional inline consumer and product creation
+ */
+type SimplePaymentLinkInput = {
+    name: string;
+    description?: string;
+    amount: number;
+    currency?: string;
+    consumer?: {
+        id?: string;
+        email?: string;
+        phone?: string;
+        name?: string;
+        metadata?: Record<string, unknown>;
+    };
+    product?: {
+        id?: string;
+        name?: string;
+        description?: string;
+        price?: number;
+        currency?: string;
+        metadata?: Record<string, unknown>;
+    };
+    quantity?: number;
+    validUntil?: Date | string;
+    maxNumberOfPayments?: number;
+    successRedirectUrl?: string;
+    failureRedirectUrl?: string;
+    coupons?: string[];
+    customMetadata?: Record<string, unknown>;
+    contactInformationType?: "PHONE" | "EMAIL";
+};
+/**
+ * Response from simplified payment link creation
+ */
+type SimplePaymentLinkResponse = {
+    paymentLink: PaymentLinkDetailed;
+    paymentUrl: string;
+    productId: string;
+    consumerId: string | undefined;
+};
 
 type StreamSDKInitOptions = {
     baseUrl?: string;
@@ -2172,6 +2213,40 @@ declare class StreamClient {
      * (Field name can vary; we keep it defensive.)
      */
     getPaymentUrl(link: PaymentLinkDetailed): string | null;
+    /**
+     * Simplified one-step payment link creation.
+     *
+     * This method handles:
+     * 1. Creating consumer (if consumer details provided without ID)
+     * 2. Creating product (if product details provided without ID)
+     * 3. Creating payment link
+     * 4. Returning payment URL
+     *
+     * @example
+     * ```typescript
+     * const result = await client.createSimplePaymentLink({
+     *   name: "Order #1234",
+     *   description: "Payment for premium subscription",
+     *   amount: 99.99,
+     *   currency: "SAR",
+     *   consumer: {
+     *     email: "customer@example.com",
+     *     name: "John Doe"
+     *   },
+     *   product: {
+     *     name: "Premium Subscription",
+     *     price: 99.99,
+     *     currency: "SAR"
+     *   },
+     *   successRedirectUrl: "https://example.com/success",
+     *   failureRedirectUrl: "https://example.com/failed"
+     * });
+     *
+     * console.log(result.paymentUrl); // Direct payment URL
+     * // Optional: Redirect user to result.paymentUrl
+     * ```
+     */
+    createSimplePaymentLink(input: SimplePaymentLinkInput): Promise<SimplePaymentLinkResponse>;
 }
 
-export { type ConsumerCreate, type ConsumerListResponse, type ConsumerResponse, type ConsumerUpdate, type CouponCreate, type CouponDetailed, type CouponListResponse, type CouponUpdate, type CreateLinkInput, type CreatePaymentLinkDto, type FreezeListResponse, type FreezeSubscriptionBase, type FreezeSubscriptionCreateRequest, type FreezeSubscriptionUpdateRequest, type InvoiceDetailed, type InvoiceListItem, type InvoiceListResponse, type Pagination, type PaginationParams, type PaymentLinkDetailed, type PaymentLinkListResponse, type PaymentListResponse, type PaymentRefundRequest, type PaymentResponse, type ProductCreate, type ProductDto, type ProductListResponse, type ProductUpdate, type SubscriptionCancel, type SubscriptionCreate, type SubscriptionDetailed, type SubscriptionListResponse, type SubscriptionUpdate, StreamSDK as default };
+export { type ConsumerCreate, type ConsumerListResponse, type ConsumerResponse, type ConsumerUpdate, type CouponCreate, type CouponDetailed, type CouponListResponse, type CouponUpdate, type CreateLinkInput, type CreatePaymentLinkDto, type FreezeListResponse, type FreezeSubscriptionBase, type FreezeSubscriptionCreateRequest, type FreezeSubscriptionUpdateRequest, type InvoiceDetailed, type InvoiceListItem, type InvoiceListResponse, type Pagination, type PaginationParams, type PaymentLinkDetailed, type PaymentLinkListResponse, type PaymentListResponse, type PaymentRefundRequest, type PaymentResponse, type ProductCreate, type ProductDto, type ProductListResponse, type ProductUpdate, type SimplePaymentLinkInput, type SimplePaymentLinkResponse, type SubscriptionCancel, type SubscriptionCreate, type SubscriptionDetailed, type SubscriptionListResponse, type SubscriptionUpdate, StreamSDK as default };

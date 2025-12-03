@@ -1,0 +1,13 @@
+{
+  "name": "stream-sdk-examples",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Examples for @streampayments/stream-sdk",
+  "scripts": {
+    "express": "node express.js"
+  },
+  "dependencies": {
+    "@streampayments/stream-sdk": "file:..",
+    "express": "^4.18.2"
+  }
+}

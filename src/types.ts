@@ -93,3 +93,61 @@ export type CreateLinkInput = {
   customMetadata?: Record<string, unknown> | null;
   contactInformationType?: "PHONE" | "EMAIL" | null;
 };
+
+// ===========================
+// SIMPLIFIED PAYMENT LINK CREATION
+// ===========================
+
+/**
+ * High-level payment link creation with optional inline consumer and product creation
+ */
+export type SimplePaymentLinkInput = {
+  // Payment link details
+  name: string;
+  description?: string;
+  amount: number;
+  currency?: string;
+
+  // Consumer (optional) - either ID or create inline
+  consumer?: {
+    id?: string;
+    email?: string;
+    phone?: string;
+    name?: string;
+    metadata?: Record<string, unknown>;
+  };
+
+  // Product - either ID or create inline
+  product?: {
+    id?: string;
+    name?: string;
+    description?: string;
+    price?: number;
+    currency?: string;
+    metadata?: Record<string, unknown>;
+  };
+
+  // Payment link settings
+  quantity?: number;
+  validUntil?: Date | string;
+  maxNumberOfPayments?: number;
+
+  // Redirect URLs
+  successRedirectUrl?: string;
+  failureRedirectUrl?: string;
+
+  // Optional fields
+  coupons?: string[];
+  customMetadata?: Record<string, unknown>;
+  contactInformationType?: "PHONE" | "EMAIL";
+};
+
+/**
+ * Response from simplified payment link creation
+ */
+export type SimplePaymentLinkResponse = {
+  paymentLink: PaymentLinkDetailed;
+  paymentUrl: string;
+  productId: string;
+  consumerId: string | undefined;
+};

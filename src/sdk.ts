@@ -15,6 +15,8 @@ import type {
   CreatePaymentLinkDto,
   PaymentLinkDetailed,
   PaymentLinkListResponse,
+  SimplePaymentLinkInput,
+  SimplePaymentLinkResponse,
   // Coupons
   CouponCreate,
   CouponDetailed,
@@ -538,6 +540,134 @@ export class StreamClient {
       anyLink?.checkout_url ??
       null
     );
+  }
+
+  // ===========================
+  // SIMPLIFIED PAYMENT LINK CREATION
+  // ===========================
+
+  /**
+   * Simplified one-step payment link creation.
+   *
+   * This method handles:
+   * 1. Creating consumer (if consumer details provided without ID)
+   * 2. Creating product (if product details provided without ID)
+   * 3. Creating payment link
+   * 4. Returning payment URL
+   *
+   * @example
+   * ```typescript
+   * const result = await client.createSimplePaymentLink({
+   *   name: "Order #1234",
+   *   description: "Payment for premium subscription",
+   *   amount: 99.99,
+   *   currency: "SAR",
+   *   consumer: {
+   *     email: "customer@example.com",
+   *     name: "John Doe"
+   *   },
+   *   product: {
+   *     name: "Premium Subscription",
+   *     price: 99.99,
+   *     currency: "SAR"
+   *   },
+   *   successRedirectUrl: "https://example.com/success",
+   *   failureRedirectUrl: "https://example.com/failed"
+   * });
+   *
+   * console.log(result.paymentUrl); // Direct payment URL
+   * // Optional: Redirect user to result.paymentUrl
+   * ```
+   */
+  async createSimplePaymentLink(input: SimplePaymentLinkInput): Promise<SimplePaymentLinkResponse> {
+    let consumerId: string | undefined;
+    let productId: string;
+
+    // Step 1: Handle consumer creation (optional)
+    if (input.consumer) {
+      if (input.consumer.id) {
+        consumerId = input.consumer.id;
+      } else if (input.consumer.email || input.consumer.phone || input.consumer.name) {
+        const consumerData: Partial<ConsumerCreate> = {};
+
+        if (input.consumer.name !== undefined) {
+          consumerData.name = input.consumer.name;
+        }
+        if (input.consumer.email !== undefined) {
+          consumerData.email = input.consumer.email;
+        }
+        if (input.consumer.phone !== undefined) {
+          consumerData.phone_number = input.consumer.phone;
+        }
+
+        if (consumerData.name || consumerData.email || consumerData.phone_number) {
+          const consumer = await this.createConsumer(consumerData as ConsumerCreate);
+          consumerId = consumer.id;
+        }
+      }
+    }
+
+    // Step 2: Handle product creation (required)
+    if (input.product?.id) {
+      productId = input.product.id;
+    } else {
+      const productData: Partial<ProductCreate> = {
+        name: input.product?.name || input.name,
+        price: input.product?.price || input.amount
+      };
+
+      if (input.product?.description !== undefined) {
+        productData.description = input.product.description;
+      }
+
+      const product = await this.createProduct(productData as ProductCreate);
+      productId = product.id;
+    }
+
+    // Step 3: Create payment link
+    const linkData: CreatePaymentLinkDto = {
+      name: input.name,
+      items: [
+        {
+          product_id: productId,
+          quantity: input.quantity ?? 1
+        } as any
+      ],
+      coupons: input.coupons ?? [],
+      max_number_of_payments: input.maxNumberOfPayments ?? null,
+      valid_until: toIsoOrNull(input.validUntil),
+      success_redirect_url: input.successRedirectUrl ?? null,
+      failure_redirect_url: input.failureRedirectUrl ?? null,
+      organization_consumer_id: consumerId ?? null,
+      custom_metadata: input.customMetadata ?? null,
+      contact_information_type: input.contactInformationType ?? null
+    } as any;
+
+    if (input.description !== undefined) {
+      (linkData as any).description = input.description;
+    }
+
+    const paymentLink = await this.http.request<PaymentLinkDetailed>({
+      method: "POST",
+      path: "/api/v2/payment_links",
+      body: linkData
+    });
+
+    // Step 4: Extract payment URL
+    const paymentUrl = this.getPaymentUrl(paymentLink);
+
+    if (!paymentUrl) {
+      throw new Error("Payment link created but no payment URL was returned from the API");
+    }
+
+    const response: SimplePaymentLinkResponse = {
+      paymentLink,
+      paymentUrl,
+      productId,
+      consumerId
+    };
+
+    return response;
   }
 }
 
